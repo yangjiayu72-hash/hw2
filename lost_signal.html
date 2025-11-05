@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost Signal - Interactive Story</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            padding: 20px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #0f0;
+            animation: flicker 3s infinite;
+        }
+
+        .communication-window {
+            background: rgba(0, 20, 0, 0.9);
+            border: 2px solid #0f0;
+            padding: 30px;
+            min-height: 300px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            margin-bottom: 30px;
+        }
+
+        .communication-window::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 255, 0, 0.03) 0px,
+                transparent 1px,
+                transparent 2px,
+                rgba(0, 255, 0, 0.03) 3px
+            );
+            pointer-events: none;
+            animation: scanlines 8s linear infinite;
+        }
+
+        .communication-window::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 255, 0, 0.02);
+            pointer-events: none;
+            animation: noise 0.2s infinite;
+        }
+
+        @keyframes scanlines {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+
+        @keyframes noise {
+            0%, 100% { opacity: 0.9; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            41.99%, 42% { opacity: 0.8; }
+            43%, 45.99%, 46% { opacity: 1; }
+            47%, 47.99% { opacity: 0.9; }
+            48% { opacity: 1; }
+            50%, 51.99% { opacity: 0.85; }
+            52% { opacity: 1; }
+        }
+
+        .message {
+            position: relative;
+            z-index: 1;
+            line-height: 1.6;
+            font-size: 1.1em;
+            transition: opacity 0.5s, filter 0.5s;
+        }
+
+        .message.noisy {
+            animation: textGlitch 0.3s infinite;
+        }
+
+        .message.fading {
+            opacity: 0.3;
+            filter: blur(2px);
+        }
+
+        @keyframes textGlitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        .timestamp {
+            color: #0a0;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .content {
+            margin-bottom: 20px;
+        }
+
+        .signal-strength {
+            font-size: 0.9em;
+            color: #0f0;
+            margin-top: 15px;
+        }
+
+        .signal-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(0, 255, 0, 0.2);
+            margin-top: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .signal-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: #0f0;
+            transition: width 0.5s;
+            width: var(--signal-strength, 50%);
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .reply-input {
+            display: none;
+            margin-top: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .reply-input.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .reply-input input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 40, 0, 0.8);
+            border: 1px solid #0f0;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+        }
+
+        .reply-input input:focus {
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        .reply-input button {
+            margin-top: 10px;
+            padding: 8px 20px;
+            background: rgba(0, 100, 0, 0.8);
+            border: 1px solid #0f0;
+            color: #0f0;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+
+        .reply-input button:hover {
+            background: rgba(0, 150, 0, 0.8);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .controls.hidden {
+            display: none;
+        }
+
+        button {
+            padding: 15px 30px;
+            background: rgba(0, 100, 0, 0.6);
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-size: 1.1em;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        button:hover {
+            background: rgba(0, 150, 0, 0.8);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .forward-menu {
+            display: none;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .forward-menu.active {
+            display: flex;
+        }
+
+        .forward-menu button {
+            padding: 10px 20px;
+            font-size: 0.9em;
+        }
+
+        .transmission-line {
+            position: absolute;
+            height: 2px;
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+            z-index: 10;
+            animation: transmit 1s ease-out;
+        }
+
+        @keyframes transmit {
+            from {
+                width: 0;
+                opacity: 1;
+            }
+            to {
+                width: 100%;
+                opacity: 0;
+            }
+        }
+
+        .stats {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 20, 0, 0.6);
+            border: 1px solid #0f0;
+            font-size: 0.9em;
+        }
+
+        .stats.hidden {
+            display: none;
+        }
+
+        .ending {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 100;
+            padding: 50px;
+            overflow-y: auto;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .ending.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .ending-content {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .ending-title {
+            font-size: 3em;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px #0f0;
+            animation: flicker 2s infinite;
+        }
+
+        .ending-text {
+            font-size: 1.2em;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+
+        .ending-stats {
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(0, 40, 0, 0.6);
+            border: 2px solid #0f0;
+            text-align: left;
+        }
+
+        .ending-stats h3 {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .ending-stats p {
+            margin: 10px 0;
+        }
+
+        .restart-button {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 1.2em;
+        }
+
+        .user-reply {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 80, 0, 0.4);
+            border-left: 3px solid #0f0;
+            font-style: italic;
+        }
+
+        .action-log {
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #0a0;
+            opacity: 0;
+            animation: logFadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes logFadeIn {
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">LOST SIGNAL</h1>
+
+        <div class="communication-window" id="commWindow">
+            <div class="message" id="message">
+                <div class="timestamp">TIMESTAMP: 2025-11-05 03:47:23 UTC</div>
+                <div class="content">
+                    <p>&gt;&gt; INCOMING TRANSMISSION &lt;&lt;</p>
+                    <p style="margin-top: 15px;">
+                        "If you're receiving this, something has gone wrong. The signal is breaking apart.
+                        I don't know how much time I have left. You need to decide—will you help me?
+                        Will you listen? Or will you let this message fade into the void?"
+                    </p>
+                    <p style="margin-top: 15px; color: #f00; animation: flicker 1s infinite;">
+                        [SIGNAL DEGRADING...]
+                    </p>
+                </div>
+                <div class="signal-strength">
+                    SIGNAL STRENGTH: <span id="signalPercent">50</span>%
+                    <div class="signal-bar" style="--signal-strength: 50%"></div>
+                </div>
+            </div>
+
+            <div class="reply-input" id="replyInput">
+                <input type="text" id="replyText" placeholder="Type your reply..." maxlength="100">
+                <button onclick="submitReply()">Send Reply</button>
+            </div>
+        </div>
+
+        <div class="controls" id="controls">
+            <button onclick="handleReply()">📡 REPLY</button>
+            <button onclick="handleIgnore()">🚫 IGNORE</button>
+            <button onclick="showForwardMenu()">📤 FORWARD</button>
+        </div>
+
+        <div class="forward-menu" id="forwardMenu">
+            <button onclick="handleForward('friend')">👥 Send to Friend</button>
+            <button onclick="handleForward('archive')">📁 Send to Archive</button>
+            <button onclick="handleForward('self')">🔄 Send to Self</button>
+            <button onclick="hideForwardMenu()">❌ Cancel</button>
+        </div>
+
+        <div class="stats" id="stats">
+            <strong>ACTIONS:</strong>
+            Replies: <span id="replyCount">0</span> |
+            Ignores: <span id="ignoreCount">0</span> |
+            Forwards: <span id="forwardCount">0</span>
+        </div>
+    </div>
+
+    <div class="ending" id="ending">
+        <div class="ending-content">
+            <h2 class="ending-title" id="endingTitle">SIGNAL TERMINATED</h2>
+            <div class="ending-text" id="endingText"></div>
+            <div class="ending-stats">
+                <h3>TRANSMISSION LOG</h3>
+                <p>Total Actions: <span id="finalTotal">0</span></p>
+                <p>Replies Sent: <span id="finalReplies">0</span></p>
+                <p>Messages Ignored: <span id="finalIgnores">0</span></p>
+                <p>Forwards Executed: <span id="finalForwards">0</span></p>
+                <p>Final Signal Strength: <span id="finalSignal">0</span>%</p>
+                <div id="userRepliesLog" style="margin-top: 20px;"></div>
+            </div>
+            <button class="restart-button" onclick="restart()">↻ RESTART TRANSMISSION</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let state = {
+            replies: 0,
+            ignores: 0,
+            forwards: 0,
+            signalStrength: 50,
+            userReplies: [],
+            forwardDestinations: [],
+            ended: false
+        };
+
+        // Audio context for sound effects
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // Sound effect functions
+        function playElectronicBeep() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+
+        function playBuzzSound() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.frequency.value = 120;
+            oscillator.type = 'sawtooth';
+
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.8);
+        }
+
+        function playTransmissionBeep() {
+            const times = [0, 0.15, 0.3];
+            times.forEach(time => {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.frequency.value = 1200;
+                oscillator.type = 'square';
+
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime + time);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + time + 0.1);
+
+                oscillator.start(audioCtx.currentTime + time);
+                oscillator.stop(audioCtx.currentTime + time + 0.1);
+            });
+        }
+
+        // Update UI
+        function updateStats() {
+            document.getElementById('replyCount').textContent = state.replies;
+            document.getElementById('ignoreCount').textContent = state.ignores;
+            document.getElementById('forwardCount').textContent = state.forwards;
+        }
+
+        function updateSignalStrength(change) {
+            state.signalStrength = Math.max(0, Math.min(100, state.signalStrength + change));
+            document.getElementById('signalPercent').textContent = Math.round(state.signalStrength);
+            document.querySelector('.signal-bar').style.setProperty('--signal-strength', state.signalStrength + '%');
+        }
+
+        function updateNoiseLevel() {
+            const message = document.getElementById('message');
+            const window = document.getElementById('commWindow');
+
+            if (state.signalStrength < 30) {
+                message.classList.add('noisy');
+                message.classList.add('fading');
+            } else if (state.signalStrength < 60) {
+                message.classList.add('noisy');
+                message.classList.remove('fading');
+            } else {
+                message.classList.remove('noisy');
+                message.classList.remove('fading');
+            }
+        }
+
+        function addActionLog(text) {
+            const message = document.getElementById('message');
+            const log = document.createElement('div');
+            log.className = 'action-log';
+            log.textContent = '> ' + text;
+            message.appendChild(log);
+        }
+
+        // Action handlers
+        function handleReply() {
+            const replyInput = document.getElementById('replyInput');
+            replyInput.classList.add('active');
+            document.getElementById('replyText').focus();
+        }
+
+        function submitReply() {
+            const replyText = document.getElementById('replyText').value.trim();
+            if (!replyText) return;
+
+            state.replies++;
+            state.userReplies.push(replyText);
+
+            // Add user reply to window
+            const message = document.getElementById('message');
+            const replyDiv = document.createElement('div');
+            replyDiv.className = 'user-reply';
+            replyDiv.textContent = '> YOUR REPLY: "' + replyText + '"';
+            message.appendChild(replyDiv);
+
+            // Hide reply input
+            const replyInput = document.getElementById('replyInput');
+            replyInput.classList.remove('active');
+            document.getElementById('replyText').value = '';
+
+            // Update signal
+            updateSignalStrength(15);
+            playElectronicBeep();
+            addActionLog('Signal strengthened. Reply transmitted.');
+
+            updateStats();
+            updateNoiseLevel();
+            checkForEnding();
+        }
+
+        function handleIgnore() {
+            state.ignores++;
+
+            updateSignalStrength(-20);
+            playBuzzSound();
+            addActionLog('Signal degrading. Message fading...');
+
+            updateStats();
+            updateNoiseLevel();
+            checkForEnding();
+        }
+
+        function showForwardMenu() {
+            document.getElementById('controls').classList.add('hidden');
+            document.getElementById('forwardMenu').classList.add('active');
+        }
+
+        function hideForwardMenu() {
+            document.getElementById('controls').classList.remove('hidden');
+            document.getElementById('forwardMenu').classList.remove('active');
+        }
+
+        function handleForward(destination) {
+            state.forwards++;
+            state.forwardDestinations.push(destination);
+
+            hideForwardMenu();
+
+            // Create transmission line animation
+            const window = document.getElementById('commWindow');
+            const line = document.createElement('div');
+            line.className = 'transmission-line';
+            line.style.top = Math.random() * 80 + 10 + '%';
+            window.appendChild(line);
+
+            setTimeout(() => line.remove(), 1000);
+
+            playTransmissionBeep();
+
+            let logText = '';
+            switch(destination) {
+                case 'friend':
+                    logText = 'Message forwarded to FRIEND. Awaiting acknowledgment...';
+                    updateSignalStrength(5);
+                    break;
+                case 'archive':
+                    logText = 'Message archived. Signal preserved in SYSTEM MEMORY.';
+                    updateSignalStrength(10);
+                    break;
+                case 'self':
+                    logText = 'Message sent to SELF. Temporal loop detected...';
+                    updateSignalStrength(-5);
+                    break;
+            }
+
+            addActionLog(logText);
+            updateStats();
+            updateNoiseLevel();
+            checkForEnding();
+        }
+
+        function checkForEnding() {
+            const totalActions = state.replies + state.ignores + state.forwards;
+
+            if (totalActions < 3) return;
+            if (state.ended) return;
+
+            let ending = null;
+
+            // Time Loop ending - sent to self
+            if (state.forwardDestinations.includes('self')) {
+                ending = {
+                    title: 'TIME LOOP DETECTED',
+                    text: `
+                        <p>The transmission completes its circuit. As the signal reaches its destination,
+                        you realize the truth that has been hidden in the noise all along.</p>
+
+                        <p style="margin-top: 20px;">The message you've been receiving... was from yourself.
+                        Across time, across space, you've been both the sender and the receiver.
+                        The signal that was breaking apart wasn't failing—it was looping.</p>
+
+                        <p style="margin-top: 20px;">Every reply you sent, every decision you made,
+                        fed back into the beginning. You've been caught in this transmission forever,
+                        and you always will be.</p>
+
+                        <p style="margin-top: 20px; color: #f00; animation: flicker 1s infinite;">
+                        [TEMPORAL PARADOX CONFIRMED]</p>
+
+                        <p style="margin-top: 20px;">The loop continues...</p>
+                    `
+                };
+            }
+            // Branch ending - frequently replied
+            else if (state.replies >= 2) {
+                ending = {
+                    title: 'NEW TIMELINE ESTABLISHED',
+                    text: `
+                        <p>Your consistent responses have stabilized the signal. The noise clears,
+                        and the transmission locks into a new, stable frequency.</p>
+
+                        <p style="margin-top: 20px;">Through your choices to engage, to reply, to connect—
+                        you've created a bridge across the void. The message that was breaking apart
+                        has found new life, branching into a reality that didn't exist before.</p>
+
+                        <p style="margin-top: 20px;">The sender receives your replies. Contact is made.
+                        A new conversation begins, one that will echo through different timelines,
+                        creating possibilities that never existed in the original signal.</p>
+
+                        <p style="margin-top: 20px; color: #0ff;">
+                        [NEW STABLE TIMELINE FORMED]</p>
+
+                        <p style="margin-top: 20px;">The signal continues, stronger than before...</p>
+                    `
+                };
+            }
+            // Dissolve ending - ignored too many times
+            else if (state.ignores >= 2) {
+                ending = {
+                    title: 'SIGNAL LOST',
+                    text: `
+                        <p>The message fades. With each ignored transmission, the signal weakened,
+                        the noise grew stronger, until finally...</p>
+
+                        <p style="margin-top: 20px;">Nothing.</p>
+
+                        <p style="margin-top: 20px;">In the vast emptiness of space, countless signals
+                        travel endlessly, hoping to find someone who will listen. This one has dissolved
+                        into static, its meaning lost forever in the background radiation of the universe.</p>
+
+                        <p style="margin-top: 20px;">Perhaps someone was reaching out. Perhaps they needed help.
+                        Perhaps this was the only chance they had to make contact.</p>
+
+                        <p style="margin-top: 20px;">Now you'll never know.</p>
+
+                        <p style="margin-top: 20px; color: #666; animation: fadeOut 2s forwards;">
+                        [TRANSMISSION TERMINATED]</p>
+
+                        <p style="margin-top: 20px; opacity: 0.3;">The silence remains...</p>
+                    `
+                };
+            }
+            // Default ending - mixed actions
+            else {
+                ending = {
+                    title: 'UNCERTAIN RESOLUTION',
+                    text: `
+                        <p>The signal fluctuates, unstable. Your mixed responses have created
+                        an indeterminate state—neither fully connected nor completely lost.</p>
+
+                        <p style="margin-top: 20px;">The transmission exists in a quantum superposition,
+                        simultaneously reaching you and missing you entirely. The sender may have received
+                        some of your replies, or none at all. The message may have been archived, or
+                        it may have scattered into noise.</p>
+
+                        <p style="margin-top: 20px;">In the space between connection and void,
+                        the signal hangs, waiting for a final choice that never came.</p>
+
+                        <p style="margin-top: 20px; color: #ff0; animation: flicker 1.5s infinite;">
+                        [STATUS: INDETERMINATE]</p>
+
+                        <p style="margin-top: 20px;">The possibility remains...</p>
+                    `
+                };
+            }
+
+            if (ending) {
+                showEnding(ending);
+            }
+        }
+
+        function showEnding(ending) {
+            state.ended = true;
+
+            document.getElementById('endingTitle').textContent = ending.title;
+            document.getElementById('endingText').innerHTML = ending.text;
+
+            document.getElementById('finalTotal').textContent = state.replies + state.ignores + state.forwards;
+            document.getElementById('finalReplies').textContent = state.replies;
+            document.getElementById('finalIgnores').textContent = state.ignores;
+            document.getElementById('finalForwards').textContent = state.forwards;
+            document.getElementById('finalSignal').textContent = Math.round(state.signalStrength);
+
+            // Show user replies if any
+            const repliesLog = document.getElementById('userRepliesLog');
+            if (state.userReplies.length > 0) {
+                repliesLog.innerHTML = '<h4 style="margin-top: 10px;">Your Replies:</h4>';
+                state.userReplies.forEach((reply, i) => {
+                    repliesLog.innerHTML += `<p style="margin: 5px 0; font-style: italic;">${i + 1}. "${reply}"</p>`;
+                });
+            }
+
+            if (state.forwardDestinations.length > 0) {
+                repliesLog.innerHTML += '<h4 style="margin-top: 15px;">Forward Destinations:</h4>';
+                repliesLog.innerHTML += '<p style="margin: 5px 0;">' +
+                    state.forwardDestinations.map(d => d.toUpperCase()).join(', ') + '</p>';
+            }
+
+            document.getElementById('ending').classList.add('active');
+        }
+
+        function restart() {
+            state = {
+                replies: 0,
+                ignores: 0,
+                forwards: 0,
+                signalStrength: 50,
+                userReplies: [],
+                forwardDestinations: [],
+                ended: false
+            };
+
+            document.getElementById('ending').classList.remove('active');
+            document.getElementById('controls').classList.remove('hidden');
+            document.getElementById('forwardMenu').classList.remove('active');
+
+            // Reset message content
+            const message = document.getElementById('message');
+            message.innerHTML = `
+                <div class="timestamp">TIMESTAMP: 2025-11-05 03:47:23 UTC</div>
+                <div class="content">
+                    <p>&gt;&gt; INCOMING TRANSMISSION &lt;&lt;</p>
+                    <p style="margin-top: 15px;">
+                        "If you're receiving this, something has gone wrong. The signal is breaking apart.
+                        I don't know how much time I have left. You need to decide—will you help me?
+                        Will you listen? Or will you let this message fade into the void?"
+                    </p>
+                    <p style="margin-top: 15px; color: #f00; animation: flicker 1s infinite;">
+                        [SIGNAL DEGRADING...]
+                    </p>
+                </div>
+                <div class="signal-strength">
+                    SIGNAL STRENGTH: <span id="signalPercent">50</span>%
+                    <div class="signal-bar" style="--signal-strength: 50%"></div>
+                </div>
+            `;
+
+            updateStats();
+            updateNoiseLevel();
+        }
+
+        // Initialize
+        updateStats();
+    </script>
+</body>
+</html>
