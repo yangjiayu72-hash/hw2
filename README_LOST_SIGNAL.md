@@ -4,14 +4,14 @@ An interactive web-based story experience where your choices determine the fate 
 
 ## How to Run
 
-Simply open `lost_signal.html` in any modern web browser (Chrome, Firefox, Safari, Edge).
+Simply open `index.html` in any modern web browser (Chrome, Firefox, Safari, Edge).
 
 ```bash
 # Option 1: Double-click the file
 # Option 2: From command line
-firefox lost_signal.html
+firefox index.html
 # or
-google-chrome lost_signal.html
+google-chrome index.html
 ```
 
 ## Story Overview
